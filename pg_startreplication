@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#
+#  pg_startreplication 0.2 - Starts new PostgreSQL slave
+#  Copyright waived 2022, Everaldo Canuto <everaldo.canuto@gmail.com>
+#
+#  The contents of this file is free and unencumbered software released into the
+#  public domain. For more information, please refer to <http://unlicense.org/>
+#
+
+set -e
+
+# check for root privileges
+if [ "$(id -u)" != "0" ]; then
+	echo "You must run this script as root" 1>&2
+	exit 1
+fi
+
+# check for master address
+if [[ -z $1 ]]; then
+	echo "Usage: pg_startreplication [master-ip-address]"
+	exit 2
+fi
+
+PG_VERSION=`pg_config --version | egrep -o "([0-9]+)" | head -n 1`
+PG_VARPATH="/var/lib/postgresql/$PG_VERSION/main"
+PG_RMASTER=$1
+
+echo "Stopping PostgreSQL"
+service postgresql stop
+
+echo "Cleaning up old cluster directory"
+rm -rf $PG_VARPATH
+
+echo "Starting base backup as replicator"
+cd /var/lib/postgresql
+sudo -u postgres pg_basebackup -h $PG_RMASTER -U postgres -X stream -D $PG_VARPATH -v -P
+
+echo "Writing $PG_VARPATH/recovery.conf file"
+cat > $PG_VARPATH/recovery.conf <<-EOF
+	standby_mode = 'on'
+	primary_conninfo = 'host=$PG_RMASTER port=5432 user=postgres'
+	trigger_file = '/tmp/postgresql.trigger'
+EOF
+
+echo Startging PostgreSQL
+service postgresql start
