@@ -33,14 +33,7 @@ rm -rf $PG_VARPATH
 
 echo "Starting base backup as replicator"
 cd /var/lib/postgresql
-sudo -u postgres pg_basebackup -h $PG_RMASTER -U postgres -X stream -D $PG_VARPATH -v -P
-
-echo "Writing $PG_VARPATH/recovery.conf file"
-cat > $PG_VARPATH/recovery.conf <<-EOF
-	standby_mode = 'on'
-	primary_conninfo = 'host=$PG_RMASTER port=5432 user=postgres'
-	trigger_file = '/tmp/postgresql.trigger'
-EOF
+sudo -u postgres pg_basebackup -h $PG_RMASTER -U postgres -X stream -D $PG_VARPATH -v -P -R
 
 echo Startging PostgreSQL
 service postgresql start
